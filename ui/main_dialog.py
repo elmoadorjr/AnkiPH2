@@ -1085,7 +1085,63 @@ class DeckBrowserDialog(QDialog):
             result = api.download_deck(deck_id)
             print(f"✓ download_deck response: {result}")
             
-            if result.get('success') and result.get('download_url'):
+            if not result.get('success'):
+                raise Exception(result.get('error', result.get('message', 'Download failed')))
+
+            if result.get('use_pull_changes'):
+                # Handle v3 pull_changes flow
+                self.status.setText("Fetching cards...")
+                QApplication.processEvents()
+                
+                # Progress callback
+                def update_progress(fetched, total):
+                    self.status.setText(f"Downloading... ({fetched}/{total})")
+                    QApplication.processEvents()
+                
+                # Pull all cards
+                changes_result = api.pull_all_cards(deck_id, progress_callback=update_progress)
+                
+                if not changes_result.get('success'):
+                    raise Exception(changes_result.get('error', 'Failed to fetch cards'))
+                
+                cards = changes_result.get('cards', [])
+                note_types = changes_result.get('note_types', [])
+                
+                if not cards:
+                    raise Exception("No cards returned from server")
+                
+                self.status.setText(f"Building ({len(cards)} cards)...")
+                QApplication.processEvents()
+                
+                # Use parent's helper to build deck
+                parent = self.parent()
+                if not hasattr(parent, '_build_deck_from_json'):
+                    # Fallback if parent is not DeckManagementDialog or method missing
+                    # We can't easily proceed without duplicating logic, so we raise friendly error
+                    raise Exception("Internal error: Installer reference missing. Please try subscribing via website.")
+                    
+                anki_deck_id = parent._build_deck_from_json(deck_id, deck, cards, note_types)
+                
+                if anki_deck_id:
+                     config.save_downloaded_deck(
+                         deck_id,
+                         deck.get('version', '1.0'),
+                         anki_deck_id,
+                         title=deck_name,
+                         card_count=len(cards)
+                     )
+                     
+                     last_change_id = changes_result.get('latest_change_id')
+                     if last_change_id:
+                         parent._save_last_change_id(deck_id, last_change_id)
+                     
+                     QMessageBox.information(self, "Success", f"Subscribed to {deck_name}!")
+                     self.accept()
+                else:
+                    raise Exception("Failed to build deck")
+
+            elif result.get('download_url'):
+                # Handle legacy download flow
                 download_url = result['download_url']
                 
                 # Download file
@@ -1098,14 +1154,16 @@ class DeckBrowserDialog(QDialog):
                     config.save_downloaded_deck(
                         deck_id,
                         deck.get('version', '1.0'),
-                        anki_deck_id
+                        anki_deck_id,
+                        title=deck_name
                     )
                     QMessageBox.information(self, "Success", f"Subscribed to {deck_name}!")
                     self.accept()
                 else:
                     raise Exception("Import failed")
+            
             else:
-                raise Exception(result.get('message', 'No download URL'))
+                 raise Exception("No download method available")
         
         except Exception as e:
             print(f"✗ Subscribe error: {e}")
