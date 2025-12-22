@@ -1,7 +1,7 @@
 """
 Deck Management Dialog for AnkiPH Addon
 AnkiHub-style two-panel layout with deck list and details
-Version: 3.3.0
+Version: 3.3.0 - FIXED: Sign in loop issue
 """
 
 import webbrowser
@@ -929,12 +929,16 @@ class DeckManagementDialog(QDialog):
             tooltip("Deck unsubscribed")
     
     def show_login(self):
-        """Show login dialog"""
+        """Show login dialog and rebuild UI on success"""
         from .login_dialog import LoginDialog
         dialog = LoginDialog(self)
-        if dialog.exec():
-            # Refresh UI in-place instead of requiring reopen
+        result = dialog.exec()
+        
+        if result == QDialog.DialogCode.Accepted:
+            # Login successful - rebuild UI to show authenticated view
             tooltip("Login successful!")
+            
+            # Rebuild the entire dialog UI
             self._rebuild_ui()
     
     def open_settings(self):

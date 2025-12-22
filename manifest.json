@@ -1,9 +1,9 @@
 {
-  "package": "AnkiPH_Addon",
+  "package": "ankiph_addon",
   "name": "AnkiPH",
-  "version": "3.1.0",
+  "version": "3.3.0",
   "author": "AnkiPH Team",
-  "homepage": "https://nottorney.lovable.app",
+  "homepage": "https://nottorney.com",
   "conflicts": [],
   "mod": 0,
   "min_point_version": 50,
