@@ -522,17 +522,21 @@ class DeckManagementDialog(QDialog):
             if token:
                 set_access_token(token)
             
-            result = api.browse_decks(category="subscribed")
+            # Increase limit to capture all subscriptions (up to 100)
+            result = api.browse_decks(category="subscribed", limit=100)
             
             if result.get('success') or 'decks' in result:
                 server_decks = result.get('decks', [])
                 local_decks = config.get_downloaded_decks()
                 server_deck_ids = {d.get('id') for d in server_decks}
                 
-                # Add new subscriptions from server
+                # Add new subscriptions from server AND update existing metadata
                 for deck in server_decks:
                     deck_id = deck.get('id')
-                    if deck_id and deck_id not in local_decks:
+                    if not deck_id:
+                        continue
+                        
+                    if deck_id not in local_decks:
                         # New subscription from web - add to local config
                         config.save_downloaded_deck(
                             deck_id=deck_id,
@@ -542,7 +546,19 @@ class DeckManagementDialog(QDialog):
                             card_count=deck.get('card_count'),
                             access_type=deck.get('access_type')
                         )
-                        print(f"✓ Synced subscription: {deck.get('title')}")
+                        print(f"✓ Synced new subscription: {deck.get('title')} (Access: {deck.get('access_type')})")
+                    else:
+                        # Existing deck - update metadata (title, access_type) but PRESERVE installed version
+                        current_version = local_decks[deck_id].get('version')
+                        config.save_downloaded_deck(
+                            deck_id=deck_id,
+                            version=current_version,  # Keep current version
+                            anki_deck_id=None,        # Keep current ID
+                            title=deck.get('title'),
+                            card_count=deck.get('card_count'),
+                            access_type=deck.get('access_type') # Update access tier
+                        )
+                        print(f"✓ Updated deck metadata: {deck.get('title')} (Access: {deck.get('access_type')})")
                 
                 # Remove local entries not on server anymore
                 for deck_id in list(local_decks.keys()):
@@ -576,6 +592,7 @@ class DeckManagementDialog(QDialog):
         has_update = config.has_update_available(data.get('deck_id', ''))
         
         if not check_access(config.get_user(), deck_info):
+            print(f"🔒 Access denied for deck {deck_info.get('title')}: access_type='{deck_info.get('access_type')}', user_tier='{config.get_subscription_tier()}'")
             self.install_status.setText("🔒 Subscription Required")
             self.install_status.setStyleSheet("color: #e57373; font-weight: bold;")
             self.sync_btn.setText("🔒 Unlock Access")
