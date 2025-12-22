@@ -591,15 +591,7 @@ class DeckManagementDialog(QDialog):
         # Update install status
         has_update = config.has_update_available(data.get('deck_id', ''))
         
-        if not check_access(config.get_user(), deck_info):
-            print(f"🔒 Access denied for deck {deck_info.get('title')}: access_type='{deck_info.get('access_type')}', user_tier='{config.get_subscription_tier()}'")
-            self.install_status.setText("🔒 Subscription Required")
-            self.install_status.setStyleSheet("color: #e57373; font-weight: bold;")
-            self.sync_btn.setText("🔒 Unlock Access")
-            self.sync_btn.setVisible(True)
-            # Ensure we don't enable open_web_btn or unsubscribe_btn if they shouldn't perform actions? 
-            # Actually unsubscribe should be allowed even if locked (to remove clutter).
-        elif not is_installed:
+        if not is_installed:
             self.install_status.setText("⚠ This deck is not installed yet!")
             self.install_status.setStyleSheet("color: #ffa726;")
             self.sync_btn.setText("🔄 Sync to Install")
@@ -650,12 +642,12 @@ class DeckManagementDialog(QDialog):
         deck_id = self.selected_deck.get('deck_id')
         deck_name = self.selected_deck.get('name', 'Unknown')
         
-        # Double-check access
-        user_data = config.get_user()
-        deck_info = self.selected_deck.get('info', {})
-        if not check_access(user_data, deck_info):
-            show_membership_required_dialog(self)
-            return
+        # Double-check access (REMOVED: client-side access check disabled)
+        # user_data = config.get_user()
+        # deck_info = self.selected_deck.get('info', {})
+        # if not check_access(user_data, deck_info):
+        #     show_membership_required_dialog(self)
+        #     return
 
         # Show sync confirmation dialog
         dialog = SyncInstallDialog(self, [deck_name])
