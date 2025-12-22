@@ -8,7 +8,8 @@ import webbrowser
 from aqt.qt import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QListWidget, QListWidgetItem, QMessageBox, Qt,
-    QWidget, QSplitter, QFrame, QCheckBox, QSizePolicy, QApplication
+    QWidget, QSplitter, QFrame, QCheckBox, QSizePolicy, QApplication,
+    pyqtSignal, QObject
 )
 from aqt import mw
 from aqt.utils import showInfo, tooltip
@@ -19,6 +20,12 @@ from ..deck_importer import import_deck
 from ..utils import escape_anki_search
 from ..update_checker import update_checker
 from ..constants import HOMEPAGE_URL, TERMS_URL, PRIVACY_URL, PLANS_URL, COMMUNITY_URL
+
+from .progress_dialog import ModernProgressDialog
+
+class ProgressSignals(QObject):
+    """Signals for progress updates"""
+    progress_update = pyqtSignal(int, int, str)
 
 
 class DeckManagementDialog(QDialog):
@@ -664,29 +671,39 @@ class DeckManagementDialog(QDialog):
         # Prepare context for background op
         token = config.get_access_token()
         
+        # Create signals and dialog
+        signals = ProgressSignals()
+        progress_dialog = ModernProgressDialog(self, title="Syncing", label="Starting download...")
+        progress_dialog.show()
+        
+        # Connect signals
+        def on_progress(current, total, status):
+            progress_dialog.update_progress(current, total, status)
+            
+        signals.progress_update.connect(on_progress)
+        
         # Define success callback
         def on_success(result):
+            progress_dialog.force_close()
             self._on_install_success(result, deck_id, deck_name)
             
         # Define failure callback
         def on_failure(error):
+            progress_dialog.force_close()
             self.setCursor(Qt.CursorShape.ArrowCursor)
             self.sync_btn.setEnabled(True)
             self.sync_btn.setText("Sync")
             QMessageBox.critical(self, "Error", f"Install failed: {error}")
         
         # Run safely with QueryOp
-        # QueryOp handles the threading and modal progress dialog
         from aqt.operations import QueryOp
         op = QueryOp(
             parent=self,
-            op=lambda col: BackgroundInstallOp(token).run(deck_id, deck_name),
+            op=lambda col: BackgroundInstallOp(token, signals).run(deck_id, deck_name),
             success=on_success
         )
         op.failure(on_failure)
-        
-        # Show modal progress dialog
-        op.with_progress(f"Installing {deck_name}...").run_in_background()
+        op.run_in_background()
 
     def _on_install_success(self, result, deck_id, deck_name):
         """Handle successful install on main thread"""
@@ -827,8 +844,9 @@ class DeckManagementDialog(QDialog):
 class BackgroundInstallOp:
     """Helper class to encapsulate background install steps"""
     
-    def __init__(self, token):
+    def __init__(self, token, signals=None):
         self.token = token
+        self.signals = signals
         
     def run(self, deck_id, deck_name):
         """Execute the installation flow in background"""
@@ -836,6 +854,9 @@ class BackgroundInstallOp:
             set_access_token(self.token)
             
         # 1. Get download info
+        if self.signals:
+            self.signals.progress_update.emit(0, 0, "Fetching deck info...")
+            
         result = api.download_deck(deck_id)
         if not result.get('success'):
             raise Exception(result.get('error', 'Download info failed'))
@@ -850,16 +871,26 @@ class BackgroundInstallOp:
             
     def _install_v3(self, deck_id, download_info):
         """V3 Pull Changes Flow"""
-        changes_result = api.pull_all_cards(deck_id)
+        # Define progress callback
+        def progress_callback(current, total):
+            if self.signals:
+                self.signals.progress_update.emit(current, total, f"Downloading cards... {current}/{total}")
+        
+        changes_result = api.pull_all_cards(deck_id, progress_callback=progress_callback)
         
         if not changes_result.get('success'):
             raise Exception(changes_result.get('error', 'Failed to fetch cards'))
+        
+        if self.signals:
+            self.signals.progress_update.emit(0, 0, "Building deck...")
             
         cards = changes_result.get('cards', [])
         note_types = changes_result.get('note_types', [])
         
         if not cards:
-            raise Exception("No cards returned from server")
+            # Check if it was empty but successful?
+            # It's possible to have 0 cards if really empty
+            pass
             
         if not mw.col:
             raise Exception("Anki collection not available")
