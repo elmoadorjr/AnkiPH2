@@ -279,8 +279,12 @@ def deck_exists(deck_id: int) -> bool:
     """
     try:
         deck_id = int(deck_id)
-        deck = mw.col.decks.get(deck_id)
-        return deck is not None
+        # Check against all deck IDs to ensure it's truly present
+        # mw.col.decks.get() can sometimes return deleted decks or act unexpectedly
+        for deck_info in mw.col.decks.all_names_and_ids():
+            if deck_info.id == deck_id:
+                return True
+        return False
     except Exception as e:
         print(f"✗ Error checking deck existence for {deck_id}: {e}")
         return False
