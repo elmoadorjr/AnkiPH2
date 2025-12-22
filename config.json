@@ -1,0 +1,10 @@
+{
+  "api_url": "https://ladvckxztcleljbiomcf.supabase.co/functions/v1",
+  "auto_sync_enabled": true,
+  "auto_sync_interval_hours": 1,
+  "downloaded_decks": {},
+  "access_token": null,
+  "refresh_token": null,
+  "expires_at": null,
+  "user": null
+}

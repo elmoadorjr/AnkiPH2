@@ -1,0 +1,11 @@
+{
+  "package": "AnkiPH_Addon",
+  "name": "AnkiPH",
+  "version": "3.1.0",
+  "author": "AnkiPH Team",
+  "homepage": "https://nottorney.lovable.app",
+  "conflicts": [],
+  "mod": 0,
+  "min_point_version": 50,
+  "max_point_version": 0
+}
