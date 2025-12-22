@@ -20,6 +20,8 @@ try:
     
     # Use simplified main dialog (v3.0.0)
     from .ui.main_dialog import AnkiPHMainDialog as MainDialog
+    # Import login dialog (v3.3.0)
+    from .ui.login_dialog import show_login_dialog
         
 except ImportError as e:
     # Defer error display until Anki is ready (mw might not be initialized yet)
@@ -48,10 +50,22 @@ def show_settings_dialog():
 
 
 def show_main_dialog():
-    """Show main dialog"""
+    """Show main dialog (with login check)"""
     global _dialog_instance
     
     try:
+        # Check if user is logged in
+        if not config.is_logged_in():
+            # Not logged in - show login dialog first
+            print("User not logged in - showing login dialog")
+            login_success = show_login_dialog(mw)
+            
+            if not login_success:
+                print("Login cancelled or failed - not showing main dialog")
+                return
+        
+        # User is logged in (or just logged in) - show main dialog
+        
         # Create new dialog instance
         _dialog_instance = MainDialog(mw)
         _dialog_instance.exec()

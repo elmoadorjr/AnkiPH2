@@ -917,6 +917,28 @@ class DeckManagementDialog(QDialog):
         
         if reply == QMessageBox.StandardButton.Yes:
             deck_id = self.selected_deck.get('deck_id')
+            
+            # Unsubscribe from server first
+            try:
+                self.setCursor(Qt.CursorShape.WaitCursor)
+                QApplication.processEvents()
+                
+                token = config.get_access_token()
+                if token:
+                    set_access_token(token)
+                    result = api.manage_subscription(action="unsubscribe", deck_id=deck_id)
+                    
+                    if not result.get('success'):
+                        QMessageBox.warning(self, "Error", f"Failed to unsubscribe: {result.get('message', 'Unknown error')}")
+                        self.setCursor(Qt.CursorShape.ArrowCursor)
+                        return
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Unsubscribe failed: {e}")
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+                return
+            finally:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+
             config.remove_downloaded_deck(deck_id)
             self.selected_deck = None
             self.detail_title.setText("Select a deck")
