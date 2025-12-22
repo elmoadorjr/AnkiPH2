@@ -917,25 +917,58 @@ class DeckManagementDialog(QDialog):
         if not self.selected_deck:
             return
         
+        deck_name = self.selected_deck.get('name')
+        deck_id = self.selected_deck.get('deck_id')
+        
         reply = QMessageBox.question(
             self, "Confirm Unsubscribe",
-            f"Remove '{self.selected_deck.get('name')}' from your subscribed decks?\n\n"
+            f"Remove '{deck_name}' from your subscribed decks?\n\n"
             "The cards will remain in Anki but you won't receive updates.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            deck_id = self.selected_deck.get('deck_id')
-            config.remove_downloaded_deck(deck_id)
-            self.selected_deck = None
-            self.detail_title.setText("Select a deck")
-            self.open_web_btn.setEnabled(False)
+            # Show loading
+            self.setCursor(Qt.CursorShape.WaitCursor)
             self.unsubscribe_btn.setEnabled(False)
-            self.install_status.setText("")
-            self.sync_btn.setVisible(False)
-            self.info_container.setVisible(False)
-            self.load_decks()
-            tooltip("Deck unsubscribed")
+            QApplication.processEvents()
+            
+            try:
+                # 1. Unsubscribe on server
+                token = config.get_access_token()
+                if token:
+                    set_access_token(token)
+                
+                result = api.manage_subscription("unsubscribe", deck_id)
+                
+                if not result.get('success'):
+                    raise Exception(result.get('error', 'Server rejected unsubscribe request'))
+                
+                # 2. Remove locally only on success
+                config.remove_downloaded_deck(deck_id)
+                self.selected_deck = None
+                
+                # Reset UI
+                self.detail_title.setText("Select a deck")
+                self.open_web_btn.setEnabled(False)
+                self.unsubscribe_btn.setEnabled(False)
+                self.install_status.setText("")
+                self.sync_btn.setVisible(False)
+                self.info_container.setVisible(False)
+                
+                # Refresh list
+                self.load_decks()
+                tooltip(f"Unsubscribed from {deck_name}")
+                
+            except Exception as e:
+                print(f"✗ Unsubscribe failed: {e}")
+                QMessageBox.warning(self, "Unsubscribe Failed", 
+                                  f"Could not unsubscribe from server:\n{e}\n\n"
+                                  "Please check your internet connection and try again.")
+                self.unsubscribe_btn.setEnabled(True)
+            
+            finally:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
     
     def show_login(self):
         """Show login dialog and rebuild UI on success"""
