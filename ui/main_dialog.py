@@ -626,142 +626,96 @@ class DeckManagementDialog(QDialog):
         if dialog.exec():
             self._do_install(deck_id, deck_name, dialog.use_recommended_settings)
     
+
     def _do_install(self, deck_id, deck_name, use_recommended=True):
-        """Perform the actual deck installation using v3.0 flow"""
-        # Show loading state
-        self.setCursor(Qt.CursorShape.WaitCursor)
+        """Perform the actual deck installation using v3.0 flow (Async)"""
+        # Disable sync button to prevent double-clicks
         self.sync_btn.setEnabled(False)
-        self.sync_btn.setText("Downloading...")
-        QApplication.processEvents()
+        self.sync_btn.setText("Starting...")
         
-        try:
-            token = config.get_access_token()
-            if token:
-                set_access_token(token)
-            
-            result = api.download_deck(deck_id)
-            print(f"✓ download_deck response: {result}")
-            
-            if not result.get('success'):
-                raise Exception(result.get('error', 'Download failed'))
-            
-            # V3.0 flow: use pull-changes for card data
-            if result.get('use_pull_changes'):
-                self.sync_btn.setText("Fetching cards...")
-                QApplication.processEvents()
-                self._install_from_pull_changes(deck_id, result)
-                return
-            
-            # Legacy flow: download .apkg file
-            if result.get('download_url'):
-                download_url = result['download_url']
-                print(f"✓ Got download URL: {download_url[:80]}...")
-                
-                self.sync_btn.setText("Importing...")
-                QApplication.processEvents()
-                
-                deck_content = api.download_deck_file(download_url)
-                anki_deck_id = import_deck(deck_content, deck_name)
-                
-                if anki_deck_id:
-                    config.save_downloaded_deck(
-                        deck_id,
-                        result.get('version', '1.0'),
-                        anki_deck_id,
-                        title=result.get('title', deck_name)
-                    )
-                    tooltip(f"✓ {deck_name} installed!")
-                    self.load_decks()
-                else:
-                    raise Exception("Import failed")
-                return
-            
-            raise Exception("No download method available (missing use_pull_changes and download_url)")
+        # Prepare context for background op
+        token = config.get_access_token()
         
-        except Exception as e:
-            print(f"✗ Install error: {e}")
-            QMessageBox.critical(self, "Error", f"Install failed: {e}")
-        finally:
+        # Define success callback
+        def on_success(result):
+            self._on_install_success(result, deck_id, deck_name)
+            
+        # Define failure callback
+        def on_failure(error):
             self.setCursor(Qt.CursorShape.ArrowCursor)
             self.sync_btn.setEnabled(True)
             self.sync_btn.setText("Sync")
-    
-    def _install_from_pull_changes(self, deck_id, deck_info):
-        """Install deck using v3.0 pull_changes flow with pagination"""
+            QMessageBox.critical(self, "Error", f"Install failed: {error}")
+        
+        # Run safely with QueryOp
+        # QueryOp handles the threading and modal progress dialog
+        from aqt.operations import QueryOp
+        op = QueryOp(
+            parent=self,
+            op=lambda col: BackgroundInstallOp(token).run(deck_id, deck_name),
+            success=on_success
+        )
+        op.failure(on_failure)
+        
+        # Show modal progress dialog
+        op.with_progress(f"Installing {deck_name}...").run_in_background()
+
+    def _on_install_success(self, result, deck_id, deck_name):
+        """Handle successful install on main thread"""
         try:
-            # Full sync to get all cards - with pagination for large decks
-            self.sync_btn.setText("Loading cards...")
-            QApplication.processEvents()
+            # Refresh UI
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            self.sync_btn.setEnabled(True)
+            self.sync_btn.setText("Sync")
             
-            # Define progress callback
-            def update_progress(fetched, total):
-                self.sync_btn.setText(f"Downloading cards... ({fetched}/{total})")
-                QApplication.processEvents()
-            
-            # Use paginated pull to get ALL cards
-            changes_result = api.pull_all_cards(deck_id, progress_callback=update_progress)
-            print(f"✓ pull_all_cards response: success={changes_result.get('success')}, cards={len(changes_result.get('cards', []))}")
-            
-            if not changes_result.get('success'):
-                raise Exception(changes_result.get('error', 'Failed to fetch cards'))
-            
-            cards = changes_result.get('cards', [])
-            note_types = changes_result.get('note_types', [])
-            
-            if not cards:
-                raise Exception("No cards returned from server")
-            
-            # Build deck in Anki
-            self.sync_btn.setText(f"Building deck ({len(cards)} cards)...")
-            QApplication.processEvents()
-            
-            anki_deck_id = self._build_deck_from_json(deck_id, deck_info, cards, note_types)
+            anki_deck_id = result.get('anki_deck_id')
+            version = result.get('version', '1.0')
+            title = result.get('title', deck_name)
+            card_count = result.get('card_count', 0)
             
             if anki_deck_id:
-                # Save deck mapping
+                # Update config
                 config.save_downloaded_deck(
-                    deck_id=deck_id,
-                    version=deck_info.get('version', '1.0'),
-                    anki_deck_id=anki_deck_id,
-                    title=deck_info.get('title'),
-                    card_count=len(cards)
+                    deck_id,
+                    version,
+                    anki_deck_id,
+                    title=title,
+                    card_count=card_count
                 )
                 
-                # Save last_change_id for incremental sync
-                last_change_id = changes_result.get('latest_change_id')
+                # Update last change ID if present
+                last_change_id = result.get('last_change_id')
                 if last_change_id:
                     self._save_last_change_id(deck_id, last_change_id)
                 
-                tooltip(f"✓ {deck_info.get('title', 'Deck')} installed! ({len(cards)} cards)")
+                # Reset Anki to show changes
+                if mw:
+                    mw.reset()
+                
+                tooltip(f"✓ {title} installed! ({card_count} cards)")
                 self.load_decks()
             else:
-                raise Exception("Failed to build deck in Anki")
-        
+                raise Exception("Install reported success but no deck ID returned")
+                
         except Exception as e:
-            print(f"✗ Pull changes install error: {e}")
-            raise
-    
+            QMessageBox.critical(self, "Error", f"Post-install update failed: {e}")
+
     def _build_deck_from_json(self, deck_id, deck_info, cards, note_types):
-        """Build an Anki deck from JSON card data"""
+        """Build an Anki deck from JSON card data (Synchronous - Legacy/Browser support)"""
+        # Kept for compatibility with DeckBrowserDialog which calls this via parent()
         if not mw.col:
             raise Exception("Anki collection not available")
         
         col = mw.col
         
         # Determine the actual deck name from cards' subdeck_path (if available)
-        # This avoids creating a duplicate deck when subdeck_path differs from title
         deck_name = deck_info.get('title', 'Imported Deck')
         
-        # Check first card for subdeck_path to get real deck name
         if cards and cards[0].get('subdeck_path'):
             first_path = cards[0]['subdeck_path']
-            # Use root deck from first subdeck_path
             deck_name = first_path.split('::')[0]
         
-        # Don't pre-create deck - let _add_card_to_deck create it when adding cards
-        # This prevents empty duplicate decks
         did = None
-        print(f"✓ Will create deck: {deck_name}")
         
         # Create note types first
         for nt in note_types:
@@ -778,15 +732,15 @@ class DeckManagementDialog(QDialog):
             elif result == 'updated':
                 cards_updated += 1
         
-        # Save collection
         col.save()
         mw.reset()
         
-        # Get the actual deck ID (created when adding cards)
         actual_did = col.decks.id(deck_name)
-        
-        print(f"✓ Deck built: {cards_added} added, {cards_updated} updated (deck ID: {actual_did})")
         return actual_did
+    def _add_card_to_deck(self, col, did, deck_name, card_data):
+        # Placeholder
+        pass
+
     
     def _create_or_update_note_type(self, col, note_type_data):
         """Create or update a note type from JSON data"""
@@ -981,6 +935,179 @@ class DeckManagementDialog(QDialog):
             set_access_token(None)
             QMessageBox.information(self, "Logged Out", "You have been logged out.")
             self.accept()
+
+
+
+# === HELPER CLASSES ===
+
+class BackgroundInstallOp:
+    """Helper class to encapsulate background install steps"""
+    
+    def __init__(self, token):
+        self.token = token
+        
+    def run(self, deck_id, deck_name):
+        """Execute the installation flow in background"""
+        if self.token:
+            set_access_token(self.token)
+            
+        # 1. Get download info
+        result = api.download_deck(deck_id)
+        if not result.get('success'):
+            raise Exception(result.get('error', 'Download info failed'))
+            
+        # 2. Choose flow
+        if result.get('use_pull_changes'):
+            return self._install_v3(deck_id, result)
+        elif result.get('download_url'):
+            return self._install_legacy(deck_id, deck_name, result)
+        else:
+            raise Exception("No supported install method available")
+            
+    def _install_v3(self, deck_id, download_info):
+        """V3 Pull Changes Flow"""
+        changes_result = api.pull_all_cards(deck_id)
+        
+        if not changes_result.get('success'):
+            raise Exception(changes_result.get('error', 'Failed to fetch cards'))
+            
+        cards = changes_result.get('cards', [])
+        note_types = changes_result.get('note_types', [])
+        
+        if not cards:
+            raise Exception("No cards returned from server")
+            
+        if not mw.col:
+            raise Exception("Anki collection not available")
+            
+        anki_deck_id = self._build_deck_from_json(mw.col, deck_id, download_info, cards, note_types)
+        
+        return {
+            'anki_deck_id': anki_deck_id,
+            'version': download_info.get('version', '1.0'),
+            'title': download_info.get('title'),
+            'card_count': len(cards),
+            'last_change_id': changes_result.get('latest_change_id')
+        }
+
+    def _install_legacy(self, deck_id, deck_name, result):
+        """Legacy .apkg Flow"""
+        download_url = result['download_url']
+        deck_content = api.download_deck_file(download_url)
+        
+        anki_deck_id = import_deck(deck_content, deck_name)
+        
+        if not anki_deck_id:
+            raise Exception("Import returned no deck ID")
+            
+        return {
+            'anki_deck_id': anki_deck_id,
+            'version': result.get('version', '1.0'),
+            'title': result.get('title', deck_name),
+            'card_count': 0,
+            'last_change_id': None
+        }
+
+    def _build_deck_from_json(self, col, deck_id, deck_info, cards, note_types):
+        """Build deck (thread-safe, does NOT call mw.reset)"""
+        deck_name = deck_info.get('title', 'Imported Deck')
+        if cards and cards[0].get('subdeck_path'):
+            deck_name = cards[0]['subdeck_path'].split('::')[0]
+            
+        for nt in note_types:
+             self._create_or_update_note_type(col, nt)
+             
+        did = None
+        for card_data in cards:
+            self._add_card_to_deck(col, did, deck_name, card_data)
+            
+        actual_did = col.decks.id(deck_name)
+        col.save()
+        
+        return actual_did
+    
+    def _create_or_update_note_type(self, col, note_type_data):
+        """Create or update note type (Helper)"""
+        model_name = note_type_data.get('name')
+        if not model_name: return None
+        
+        existing = col.models.by_name(model_name)
+        if existing: return existing
+        
+        model = col.models.new(model_name)
+        
+        fields = note_type_data.get('fields', [])
+        for field_data in fields:
+            field_name = field_data.get('name') if isinstance(field_data, dict) else field_data
+            field = col.models.new_field(field_name)
+            col.models.add_field(model, field)
+        
+        templates = note_type_data.get('templates', [])
+        for tmpl_data in templates:
+            tmpl_name = tmpl_data.get('name', 'Card 1')
+            tmpl = col.models.new_template(tmpl_name)
+            tmpl['qfmt'] = tmpl_data.get('qfmt', '{{Front}}')
+            tmpl['afmt'] = tmpl_data.get('afmt', '{{FrontSide}}<hr id="answer">{{Back}}')
+            col.models.add_template(model, tmpl)
+        
+        model['css'] = note_type_data.get('css', '')
+        col.models.add(model)
+        return model
+
+    def _add_card_to_deck(self, col, did, deck_name, card_data):
+        """Add or update a card in Anki from JSON data"""
+        from anki.notes import Note
+        
+        guid = card_data.get('card_guid')
+        if not guid: return None
+        
+        note_type_name = card_data.get('note_type', 'Basic')
+        model = col.models.by_name(note_type_name)
+        
+        if not model:
+            model = col.models.by_name('Basic')
+            if not model: return None
+        
+        escaped_guid = escape_anki_search(guid)
+        existing_nids = col.find_notes(f'guid:{escaped_guid}')
+        
+        if existing_nids:
+            note = col.get_note(existing_nids[0])
+            fields = card_data.get('fields', {})
+            field_names = col.models.field_names(note.mid)
+            
+            for i, field_name in enumerate(field_names):
+                if field_name in fields:
+                    note.fields[i] = fields[field_name]
+            
+            note.tags = card_data.get('tags', [])
+            col.update_note(note)
+            return 'updated'
+        
+        note = Note(col, model)
+        note.guid = guid
+        
+        fields = card_data.get('fields', {})
+        field_names = col.models.field_names(model)
+        
+        for i, field_name in enumerate(field_names):
+            if field_name in fields:
+                note.fields[i] = fields[field_name]
+        
+        note.tags = card_data.get('tags', [])
+        
+        subdeck_path = card_data.get('subdeck_path')
+        if subdeck_path:
+            note_deck_id = col.decks.id(subdeck_path)
+        elif did: # did might be None here...
+             # Actually original code used `deck_id` param but called `deck_id` earlier.
+             # The new signature has `did` as 2nd arg
+             note_deck_id = did or col.decks.id(deck_name)
+        else:
+             note_deck_id = col.decks.id(deck_name)
+        
+        col.add_note(note, note_deck_id)
+        return 'added'
 
 
 # === HELPER DIALOGS ===

@@ -1,8 +1,11 @@
 
 
-Case 5: I click the AnkiPH login_dialog's Forgot Password and Register Now links - No dedicated Forgot Password page or Forgot Password dialog in webapp not triggered AnD/or SignUp tab in /auth not opened.
 
-case 6: I sign up - Deck rebuild - is slow - delayed at least 1 second.
+
+
+
+case 6: Asynchronous or synchronous - should UI freeze to focus on dialog process?
+
 
 case 7: Im on free tier limited access account - i click browse decks in deck management - and nottorney collection which is a paid deck is displayed - i click install -and downloading a paid deck is allowed. WHY? free tier accounts shouldnt be able to download paid decks. - backend should not allow - free tier users to subscribe to paid decks - because once they can subscribe - they can sync it freely via addon.
 
@@ -35,4 +38,21 @@ case 17: I am syncing a 33000 card deck - and downloading UI sucks - its just a 
 case 18: just synced the 33,000+ cards nottorney deck - but it shows specifically i synced only 32655 decks - i dont know if this is the actual number of cards that is from the Nottorney Collection in database - there might be missing cards synced??? or leakage?
 
 case 19: I delete two synced decks that im subscribed to. checking addon behavior. deck management - showing both Installed and up to date? What? They are gone and deleted - why still showing installed and up to date? I click unsubscribe button for each deck - doesnt actually unsubscribe me - it just refreshed the decks and now addon detects i dont have them installed - button still shows im subscribed because its prompting me to unsubscribe - What does the unsubscribe button actually do? Is there actually no way to unsubscribe from a deck via addon?
+
+case 20: Why is Browse decks dialog necessary in Deck Management - when we can just link the actual website - ankiph.lovable.app/collection?
+
+Case 6: Deck Management - each deck's Open in Web button - doesnt actually link the the decks's specific page in collection or deck/id page.
+
+BOTH BACKEND AND ADDON:
+
+CRITICAL ISSUE 1: 
+
+"Deck creation feature coming soon!
+
+You can create decks at:
+https://ankiph.lovable.app"
+
+
+BACKEND - ISSUES:
+Case 5: I click the AnkiPH login_dialog's Forgot Password and Register Now links - No dedicated Forgot Password page or Forgot Password dialog in webapp not triggered AnD/or SignUp tab in /auth not opened.
 
