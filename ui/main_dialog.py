@@ -618,7 +618,8 @@ class DeckManagementDialog(QDialog):
         dialog = CreateDeckConfirmDialog(self)
         if dialog.exec():
             # Open deck creation form
-            from .tabbed_dialog import TabbedDialog
+            # Open deck creation form
+            # from .tabbed_dialog import TabbedDialog
             # For now, just show info - full creation UI would be added later
             showInfo("Deck creation feature coming soon!\n\nYou can create decks at:\n" + HOMEPAGE_URL)
     

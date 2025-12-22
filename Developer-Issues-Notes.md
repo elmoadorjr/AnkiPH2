@@ -1,9 +1,4 @@
 
-Case 2: I deleted a previously installed Deck - Deck Management - still shows Installed and Up to date.
-
-Case 3: I unsubscribed from a Deck - Result: Deck is still subscribed - And still gives option to Unsubscribe.
-
-Case 4: I downloaded a 23 card deck - Result: it worked but there was a short freeze - and is bad for UX.
 
 Case 5: I click the AnkiPH login_dialog's Forgot Password and Register Now links - No dedicated Forgot Password page or Forgot Password dialog in webapp not triggered AnD/or SignUp tab in /auth not opened.
 
