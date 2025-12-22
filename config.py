@@ -381,7 +381,7 @@ class Config:
     
     # === DOWNLOADED DECKS TRACKING (PROFILE-SPECIFIC) ===
     
-    def save_downloaded_deck(self, deck_id, version, anki_deck_id=None, title=None, card_count=None):
+    def save_downloaded_deck(self, deck_id, version, anki_deck_id=None, title=None, card_count=None, access_type=None):
         """
         Track a downloaded deck (PROFILE-SPECIFIC)
         
@@ -391,6 +391,7 @@ class Config:
             anki_deck_id: Anki's internal deck ID (optional, None if not installed)
             title: Deck title from server (optional)
             card_count: Number of cards (optional)
+            access_type: Deck access type ('free_tier' or 'paid')
         """
         if not deck_id:
             print("✗ Cannot save deck: no deck_id provided")
@@ -419,6 +420,7 @@ class Config:
             'anki_deck_id': anki_deck_id if anki_deck_id is not None else existing.get('anki_deck_id'),
             'title': title or existing.get('title'),
             'card_count': card_count if card_count is not None else existing.get('card_count'),
+            'access_type': access_type or existing.get('access_type'),
             'downloaded_at': existing.get('downloaded_at') or datetime.now().isoformat(),
             'last_synced': None
         }
