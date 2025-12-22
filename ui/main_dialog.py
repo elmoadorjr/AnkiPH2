@@ -1094,18 +1094,127 @@ class CreateDeckConfirmDialog(QDialog):
         self.accept()
 
 
+
+class UpgradePromptDialog(QDialog):
+    """Premium upgrade prompt with learning resources"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("AnkiPH Membership")
+        self.setFixedWidth(400)
+        self.setup_ui()
+        self.apply_styles()
+        
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(30, 30, 30, 30)
+        
+        # Icon/Header
+        header = QLabel("💎")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header.setStyleSheet("font-size: 48px; margin-bottom: 5px;")
+        layout.addWidget(header)
+        
+        # Title
+        title = QLabel("Unlock Full Access")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #fff; margin-bottom: 10px;")
+        layout.addWidget(title)
+        
+        # Description
+        desc_text = (
+            "The action you are trying to perform is exclusive to AnkiPH members.\n\n"
+            "Unlock unlimited collaborative decks, passive background syncing, and priority support."
+        )
+        desc = QLabel(desc_text)
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setWordWrap(True)
+        desc.setStyleSheet("color: #b0b0b0; font-size: 14px; line-height: 1.4;")
+        layout.addWidget(desc)
+        
+        # Spacer
+        layout.addSpacing(10)
+        
+        # Buttons container
+        btn_layout = QVBoxLayout()
+        btn_layout.setSpacing(10)
+        
+        # Upgrade Button (Primary)
+        from aqt.utils import openLink
+        
+        upgrade_btn = QPushButton("Unlock Membership")
+        upgrade_btn.setObjectName("upgradeBtn")
+        upgrade_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        upgrade_btn.setMinimumHeight(45)
+        upgrade_btn.clicked.connect(lambda: [openLink(PLANS_URL), self.accept()])
+        btn_layout.addWidget(upgrade_btn)
+        
+        # Learn More Button (Secondary)
+        learn_btn = QPushButton("Learn More")
+        learn_btn.setObjectName("learnBtn")
+        learn_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        learn_btn.setMinimumHeight(35)
+        # Point to community or a learn page if available, defaulting to plans for now as it usually describes features
+        learn_btn.clicked.connect(lambda: openLink(PLANS_URL)) 
+        btn_layout.addWidget(learn_btn)
+        
+        # Cancel (Tertiary)
+        cancel_btn = QPushButton("Maybe Later")
+        cancel_btn.setObjectName("cancelBtn")
+        cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        
+        layout.addLayout(btn_layout)
+        
+    def apply_styles(self):
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e1e;
+            }
+            #upgradeBtn {
+                background-color: #E6C200; /* Gold/Premium Color */
+                color: #000;
+                font-weight: bold;
+                font-size: 15px;
+                border-radius: 6px;
+                border: none;
+            }
+            #upgradeBtn:hover {
+                background-color: #FFD54F;
+            }
+            #learnBtn {
+                background-color: transparent;
+                color: #4a90d9;
+                font-size: 14px;
+                border: 1px solid #333;
+                border-radius: 6px;
+                font-weight: bold;
+            }
+            #learnBtn:hover {
+                background-color: #2a2a2a;
+                border-color: #4a90d9;
+            }
+            #cancelBtn {
+                background-color: transparent;
+                color: #666;
+                font-size: 13px;
+                border: none;
+                margin-top: 5px;
+            }
+            #cancelBtn:hover {
+                color: #888;
+                text-decoration: underline;
+            }
+        """)
+
+
 def show_membership_required_dialog(parent=None):
-    """Show friendly paywall dialog"""
-    msg = QMessageBox(parent)
-    msg.setWindowTitle("Oh no!")
-    msg.setIcon(QMessageBox.Icon.Warning)
-    msg.setText("The action you are trying to perform requires an active membership.")
-    msg.setInformativeText(
-        f'Unlock a membership here: <a href="{PLANS_URL}">AnkiPH Plans</a>\n\n'
-        f'Or if you prefer, reach out for support at our <a href="{COMMUNITY_URL}">AnkiPH Community</a>.'
-    )
-    msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-    msg.exec()
+    """Show beautiful upgrade prompt"""
+    dialog = UpgradePromptDialog(parent)
+    dialog.exec()
+
 
 
 # For backwards compatibility - alias to new dialog
