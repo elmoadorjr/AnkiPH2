@@ -483,14 +483,23 @@ class DeckManagementDialog(QDialog):
                 if anki_deck_id and mw.col:
                     # Use proper deck_exists check
                     is_installed = deck_exists(anki_deck_id)
-                    if is_installed and not server_title:
-                        # Only use Anki name if no server title
+                    
+                    # VALIDATION: Check for phantom link to Default deck
+                    if is_installed:
                         try:
                             deck = mw.col.decks.get(int(anki_deck_id))
-                            if deck and deck['name'] != 'Default':
-                                deck_name = deck['name']
-                        except:
-                            pass
+                            if deck:
+                                # If pointing to 'Default' deck but expecting something else, treat as not installed
+                                # (This happens if deck was deleted and Anki reset ID 1 to Default)
+                                if deck['name'] == 'Default' and server_title != 'Default':
+                                    is_installed = False
+                                    
+                                # If installed and not default, can update name fallback
+                                elif deck['name'] != 'Default' and not server_title:
+                                    deck_name = deck['name']
+                        except Exception as e:
+                            # If we can't verify, assume the initial check was correct but log it
+                            print(f"Error validating deck {anki_deck_id}: {e}")
                 
                 # Show install status in list (only show ⚠ for not installed)
                 prefix = "" if is_installed else "⚠ "

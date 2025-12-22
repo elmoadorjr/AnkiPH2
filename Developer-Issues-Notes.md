@@ -1,4 +1,3 @@
-Case 1: I attempted to Subscribe to an Anki Deck via Addon - Result: Subscribe Failed - No Download URL
 
 Case 2: I deleted a previously installed Deck - Deck Management - still shows Installed and Up to date.
 
@@ -10,7 +9,7 @@ Case 5: I click the AnkiPH login_dialog's Forgot Password and Register Now links
 
 case 6: I sign up - Deck rebuild - is slow - delayed at least 1 second.
 
-case 7: Im on free tier limited access account - i click browse decks in deck management - and nottorney collection which is a paid deck is displayed - i click install - it sorta allows me but there is an error from case 1 - in which case IF case 1 was fixed - and downloading a paid deck did allow?? then it would be broken - because free tier accounts - cant download paid decks.
+case 7: Im on free tier limited access account - i click browse decks in deck management - and nottorney collection which is a paid deck is displayed - i click install -and downloading a paid deck is allowed. WHY? free tier accounts shouldnt be able to download paid decks. - backend should not allow - free tier users to subscribe to paid decks - because once they can subscribe - they can sync it freely via addon.
 
 Case 8: Im not logged in- im aware of this - i click AnkiPH button in topnav - it shows me a blank Dialog that has a button Sign IN - I click it and leads me to Login_dialog - but i feel like this part is unnecessary - and interferes with user UX - because if im not logged in - why not just call Login_dialog first.
 
@@ -35,4 +34,10 @@ d. sync_dialog.py
 e. tabbed_dialog.py
 
 case 16: I opened deck management - clicked browse decks - then browse decks dialog opened - and it let me subscribe to a free tier deck - but after I subscribed - it automatically installed it - should this be automatic? Maybe? i think it being automatic makes it simple - but user should be informed that it will be downloaded automatically when they subscribe via either addon or webapp.
+
+case 17: I am syncing a 33000 card deck - and downloading UI sucks - its just a text - of 1000/33000 - no UI or beauitiful dialog or something actually modern???
+
+case 18: just synced the 33,000+ cards nottorney deck - but it shows specifically i synced only 32655 decks - i dont know if this is the actual number of cards that is from the Nottorney Collection in database - there might be missing cards synced??? or leakage?
+
+case 19: I delete two synced decks that im subscribed to. checking addon behavior. deck management - showing both Installed and up to date? What? They are gone and deleted - why still showing installed and up to date? I click unsubscribe button for each deck - doesnt actually unsubscribe me - it just refreshed the decks and now addon detects i dont have them installed - button still shows im subscribed because its prompting me to unsubscribe - What does the unsubscribe button actually do? Is there actually no way to unsubscribe from a deck via addon?
 

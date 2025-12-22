@@ -106,20 +106,9 @@ def import_deck(deck_content: bytes, deck_name: str) -> int:
                 deck_id = matching_deck.id
                 print(f"✓ Found existing deck: '{matching_deck.name}' (ID: {deck_id})")
             else:
-                # Last resort: get the most recently modified deck
-                print(f"⚠ Searching for most recently modified deck...")
-                all_deck_dicts = []
-                for deck_info in mw.col.decks.all_names_and_ids():
-                    deck_dict = mw.col.decks.get(deck_info.id)
-                    if deck_dict:
-                        all_deck_dicts.append(deck_dict)
-                
-                if all_deck_dicts:
-                    most_recent = max(all_deck_dicts, key=lambda d: d.get('mod', 0))
-                    deck_id = most_recent['id']
-                    print(f"⚠ Using most recent deck: '{most_recent['name']}' (ID: {deck_id})")
-                else:
-                    raise Exception("Could not determine imported deck ID")
+                # Last resort: Fail safely rather than guessing
+                # Picking "most recently modified" is dangerous as it might link to an unrelated deck
+                print(f"⚠ Could not identify imported deck by ID or name.")
         
         if not deck_id:
             raise Exception("Failed to find imported deck")
