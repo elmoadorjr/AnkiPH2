@@ -28,6 +28,51 @@ class ProgressSignals(QObject):
     progress_update = pyqtSignal(int, int, str)
 
 
+class DeckListItemWidget(QWidget):
+    """Custom widget for deck list items to show rich status"""
+    def __init__(self, name, is_installed, has_update, parent=None):
+        super().__init__(parent)
+        # Main layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(2)
+        
+        # Title
+        self.title_label = QLabel(name)
+        self.title_label.setObjectName("deckListTitle")
+        layout.addWidget(self.title_label)
+        
+        # Status Row
+        status_row = QHBoxLayout()
+        status_row.setSpacing(4)
+        status_row.setContentsMargins(0, 0, 0, 0)
+        
+        if not is_installed:
+            icon = QLabel("⚠")
+            text = QLabel("Not Installed")
+            icon.setStyleSheet("color: #ffa726;")
+            text.setStyleSheet("color: #ffa726; font-size: 11px;")
+            status_row.addWidget(icon)
+            status_row.addWidget(text)
+        elif has_update:
+            icon = QLabel("⬆")
+            text = QLabel("Update Available")
+            icon.setStyleSheet("color: #4a90d9;")
+            text.setStyleSheet("color: #4a90d9; font-size: 11px;")
+            status_row.addWidget(icon)
+            status_row.addWidget(text)
+        else:
+            icon = QLabel("✓")
+            text = QLabel("Up to date")
+            icon.setStyleSheet("color: #4CAF50;")
+            text.setStyleSheet("color: #888; font-size: 11px;")
+            status_row.addWidget(icon)
+            status_row.addWidget(text)
+            
+        status_row.addStretch()
+        layout.addLayout(status_row)
+
+
 class DeckManagementDialog(QDialog):
     """AnkiHub-style two-panel deck management dialog"""
     
@@ -93,7 +138,7 @@ class DeckManagementDialog(QDialog):
         # Refresh button
         refresh_btn = QPushButton("🔄 Refresh")
         refresh_btn.setObjectName("secondaryBtn")
-        refresh_btn.clicked.connect(self.load_decks)
+        refresh_btn.clicked.connect(self.on_refresh_clicked)
         layout.addWidget(refresh_btn)
         
         layout.addStretch()
@@ -171,7 +216,31 @@ class DeckManagementDialog(QDialog):
         """Create right panel with deck details"""
         panel = QFrame()
         panel.setObjectName("rightPanel")
-        layout = QVBoxLayout(panel)
+        # Main layout for the panel
+        main_layout = QVBoxLayout(panel)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # --- Empty State ---
+        self.empty_state = QWidget()
+        empty_layout = QVBoxLayout(self.empty_state)
+        empty_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        empty_icon = QLabel("🗃")
+        empty_icon.setStyleSheet("font-size: 48px; color: #333;")
+        empty_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_layout.addWidget(empty_icon)
+        
+        empty_label = QLabel("Select a deck to view details")
+        empty_label.setStyleSheet("color: #666; font-size: 14px; margin-top: 10px;")
+        empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_layout.addWidget(empty_label)
+        
+        main_layout.addWidget(self.empty_state)
+        
+        # --- Details Content ---
+        self.details_content = QWidget()
+        self.details_content.setVisible(False)
+        layout = QVBoxLayout(self.details_content)
         layout.setContentsMargins(20, 15, 20, 15)
         layout.setSpacing(12)
         
@@ -240,6 +309,8 @@ class DeckManagementDialog(QDialog):
         
         layout.addStretch()
         
+        main_layout.addWidget(self.details_content)
+        
         return panel
     
     def _create_status_bar(self):
@@ -260,6 +331,8 @@ class DeckManagementDialog(QDialog):
         status = config.get_access_status_text()
         status_label = QLabel(status)
         status_label.setObjectName("subscriptionBadge" if config.has_full_access() else "freeBadge")
+        # Fix: Prevent badge from stretching huge
+        status_label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         layout.addWidget(status_label)
         
         layout.addStretch()
@@ -280,7 +353,10 @@ class DeckManagementDialog(QDialog):
     
     def apply_styles(self):
         """Apply dark theme styles matching AnkiHub"""
-        self.setStyleSheet("""
+        self.setStyleSheet(self._get_stylesheet())
+
+    def _get_stylesheet(self):
+        return """
             QDialog {
                 background-color: #1e1e1e;
                 color: #e0e0e0;
@@ -336,17 +412,24 @@ class DeckManagementDialog(QDialog):
                 border: none;
                 color: #e0e0e0;
                 font-size: 13px;
+                outline: none;
             }
             #deckList::item {
-                padding: 10px 15px;
                 border-bottom: 1px solid #2a2a2a;
+                padding: 0px; /* Custom widget handles padding */
             }
             #deckList::item:selected {
                 background-color: #3a5070;
-                color: white;
             }
             #deckList::item:hover:!selected {
                 background-color: #2a2a2a;
+            }
+            
+            /* Custom Deck Item Widget Styles */
+            #deckListTitle {
+                font-weight: bold;
+                font-size: 13px;
+                color: #e0e0e0;
             }
             
             #rightPanel {
@@ -442,6 +525,8 @@ class DeckManagementDialog(QDialog):
                 padding: 3px 10px;
                 border-radius: 10px;
                 font-size: 10px;
+                min-width: 60px;
+                qproperty-alignment: AlignCenter;
             }
             
             #freeBadge {
@@ -450,6 +535,8 @@ class DeckManagementDialog(QDialog):
                 padding: 3px 10px;
                 border-radius: 10px;
                 font-size: 10px;
+                min-width: 60px;
+                qproperty-alignment: AlignCenter;
             }
             
             #linkBtn {
@@ -463,7 +550,7 @@ class DeckManagementDialog(QDialog):
                 color: #6ab0f9;
                 text-decoration: underline;
             }
-        """)
+        """
     
     # === DATA LOADING ===
     
@@ -478,6 +565,8 @@ class DeckManagementDialog(QDialog):
             downloaded_decks = config.get_downloaded_decks()
             
             if not downloaded_decks:
+                # If truly no decks, show empty message
+                print("ℹ No decks found in local config after sync")
                 item = QListWidgetItem("No decks yet - click Browse Decks")
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
                 self.deck_list.addItem(item)
@@ -486,38 +575,61 @@ class DeckManagementDialog(QDialog):
             # Import deck_exists helper
             from ..deck_importer import deck_exists
             
+            print(f"Loading {len(downloaded_decks)} decks into UI...")
+            
             for deck_id, deck_info in downloaded_decks.items():
-                # Get deck name - prefer server title, fallback to Anki deck name
-                anki_deck_id = deck_info.get('anki_deck_id')
-                server_title = deck_info.get('title')
-                deck_name = server_title or f"Deck {deck_id[:8]}"
-                is_installed = False
-                
-                if anki_deck_id and mw.col:
-                    # Use proper deck_exists check
-                    is_installed = deck_exists(anki_deck_id)
-                    if is_installed and not server_title:
-                        # Only use Anki name if no server title
-                        try:
-                            deck = mw.col.decks.get(int(anki_deck_id))
-                            if deck and deck['name'] != 'Default':
-                                deck_name = deck['name']
-                        except:
-                            pass
-                
-                # Show install status in list (only show ⚠ for not installed)
-                prefix = "" if is_installed else "⚠ "
-                item = QListWidgetItem(f"{prefix}{deck_name}")
-                item.setData(Qt.ItemDataRole.UserRole, {
-                    'deck_id': deck_id,
-                    'info': deck_info,
-                    'name': deck_name,
-                    'is_installed': is_installed
-                })
-                self.deck_list.addItem(item)
+                try:
+                    # Get deck name - prefer server title, fallback to Anki deck name
+                    anki_deck_id = deck_info.get('anki_deck_id')
+                    server_title = deck_info.get('title')
+                    deck_name = server_title or f"Deck {deck_id[:8]}"
+                    is_installed = False
+                    
+                    if anki_deck_id and mw.col:
+                        # Use proper deck_exists check
+                        is_installed = deck_exists(anki_deck_id)
+                        if is_installed and not server_title:
+                            # Only use Anki name if no server title
+                            try:
+                                deck = mw.col.decks.get(int(anki_deck_id))
+                                if deck and deck['name'] != 'Default':
+                                    deck_name = deck['name']
+                            except:
+                                pass
+                    
+                    # Create list item
+                    item = QListWidgetItem(self.deck_list)
+                    
+                    # Check update status
+                    has_update = config.has_update_available(deck_id)
+                    
+                    # Try to use custom widget
+                    try:
+                        widget = DeckListItemWidget(deck_name, is_installed, has_update)
+                        item.setSizeHint(widget.sizeHint()) # Use widget's size hint
+                        self.deck_list.setItemWidget(item, widget)
+                        widget.show() # Ensure visibility
+                    except Exception as widget_err:
+                        # FALLBACK: Use standard text item if custom widget fails
+                        print(f"⚠ Widget creation failed for {deck_name}: {widget_err}")
+                        prefix = "" if is_installed else "⚠ "
+                        item.setText(f"{prefix}{deck_name} (Widget Error)")
+                        item.setSizeHint(Qt.QSize(0, 30))
+                    
+                    item.setData(Qt.ItemDataRole.UserRole, {
+                        'deck_id': deck_id,
+                        'info': deck_info,
+                        'name': deck_name,
+                        'is_installed': is_installed
+                    })
+                    
+                except Exception as deck_err:
+                    print(f"✗ Failed to load deck {deck_id}: {deck_err}")
+                    continue
         
         except Exception as e:
             print(f"Error loading decks: {e}")
+            tooltip(f"Error loading decks: {e}")
     
     def _sync_subscriptions_from_server(self):
         """Sync subscriptions from server to local config"""
@@ -574,13 +686,19 @@ class DeckManagementDialog(QDialog):
                         print(f"✓ Removed unsubscribed deck: {deck_id}")
         
         except Exception as e:
-            print(f"⚠ Subscription sync failed (non-critical): {e}")
+            print(f"⚠ Subscription sync failed: {e}")
+            # Show visible feedback if sync fails so user knows why decks might be missing
+            tooltip(f"Sync failed: {str(e)[:50]}")
     
     def on_deck_selected(self, item):
         """Handle deck selection - show details in right panel"""
         data = item.data(Qt.ItemDataRole.UserRole)
         if not data:
             return
+            
+        # Switch to details view
+        self.empty_state.setVisible(False)
+        self.details_content.setVisible(True)
         
         self.selected_deck = data
         deck_info = data.get('info', {})
@@ -620,7 +738,13 @@ class DeckManagementDialog(QDialog):
         self.updated_label.setText(f"Downloaded: {deck_info.get('downloaded_at', 'Unknown')[:10] if deck_info.get('downloaded_at') else 'Not downloaded'}")
         self.info_container.setVisible(True)
     
+    
     # === ACTIONS ===
+    
+    def on_refresh_clicked(self):
+        """Handle refresh button click with feedback"""
+        self.load_decks()
+        tooltip("✓ Subscriptions synced successfully")
     
     def browse_decks(self):
         """Open deck store on web"""
@@ -737,7 +861,7 @@ class DeckManagementDialog(QDialog):
                 if mw:
                     mw.reset()
                 
-                tooltip(f"✓ {title} installed! ({card_count} cards)")
+                tooltip(f"✓ Success! {title} is now up to date.")
                 self.load_decks()
             else:
                 raise Exception("Install reported success but no deck ID returned")
@@ -796,8 +920,10 @@ class DeckManagementDialog(QDialog):
 
             config.remove_downloaded_deck(deck_id)
             self.selected_deck = None
-            self.detail_title.setText("Select a deck")
-            self.open_web_btn.setEnabled(False)
+            
+            # Reset UI to empty state
+            self.empty_state.setVisible(True)
+            self.details_content.setVisible(False)
             self.unsubscribe_btn.setEnabled(False)
             self.install_status.setText("")
             self.sync_btn.setVisible(False)
