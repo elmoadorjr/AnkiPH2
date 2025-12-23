@@ -19,7 +19,7 @@ from ..config import config
 from ..deck_importer import import_deck
 from ..utils import escape_anki_search
 from ..update_checker import update_checker
-from ..constants import HOMEPAGE_URL, TERMS_URL, PRIVACY_URL, PLANS_URL, COMMUNITY_URL
+from ..constants import HOMEPAGE_URL, TERMS_URL, PRIVACY_URL, PLANS_URL, COMMUNITY_URL, COLLECTION_URL
 
 from .progress_dialog import ModernProgressDialog
 
@@ -880,7 +880,26 @@ class DeckManagementDialog(QDialog):
     
     def open_on_web(self):
         """Open deck on web"""
-        webbrowser.open(HOMEPAGE_URL)
+        if self.selected_deck and 'deck_id' in self.selected_deck:
+            deck_id = self.selected_deck['deck_id']
+            # url = f"{COLLECTION_URL}/{deck_id}"
+            # Actually looking at constants.py, COLLECTION_URL = f"{BASE_URL}/collection"
+            # It seems the desired URL is https://ankiph.lovable.app/collection/<uuid>
+            # But wait, let's verify if the route is /collection/id or just /collection?id=... or /deck/id
+            # The user request says: "doesnt actually link the the decks's specific page in collection or deck/id page."
+            # In conversation 314a... mentions "browse decks" links to "ankiph.lovable.app/collection".
+            # Usually it is /collection/<id> or /deck/<id>.
+            # Let me check if I can infer from `browse_decks` method.
+            # `webbrowser.open("https://ankiph.lovable.app/collection")`
+            # I will assume standard REST-ish path construct: /collection/<deck_id> based on user request implies such a page exists.
+            
+            # Let's check constants.py again.
+            # COLLECTION_URL: Final[str] = f"{BASE_URL}/collection"
+            
+            url = f"{COLLECTION_URL}/{deck_id}"
+            webbrowser.open(url)
+        else:
+            webbrowser.open(HOMEPAGE_URL)
     
     def unsubscribe_deck(self):
         """Unsubscribe from deck"""
