@@ -111,7 +111,7 @@ class DeckManagementDialog(QDialog):
             layout.addWidget(self._create_action_bar())
             
             # Main content - two panel splitter
-            layout.addWidget(self._create_main_content())
+            layout.addWidget(self._create_main_content(), 1)
             
             # Bottom status bar
             layout.addWidget(self._create_status_bar())
@@ -138,7 +138,7 @@ class DeckManagementDialog(QDialog):
         bar = QWidget()
         bar.setObjectName("actionBar")
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(15, 8, 15, 8)
+        layout.setContentsMargins(10, 5, 10, 5)
         
         # Browse Decks button (primary)
         browse_btn = QPushButton("🔗 Browse Decks")
@@ -211,7 +211,7 @@ class DeckManagementDialog(QDialog):
         header_widget = QWidget()
         header_widget.setObjectName("panelHeader")
         header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(15, 8, 15, 8)
+        header_layout.setContentsMargins(10, 5, 10, 5)
         
         header_label = QLabel("Subscribed Decks")
         header_label.setStyleSheet("font-weight: bold; border: none; background: transparent;")
@@ -354,7 +354,7 @@ class DeckManagementDialog(QDialog):
         bar = QWidget()
         bar.setObjectName("statusBar")
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(15, 6, 15, 6)
+        layout.setContentsMargins(10, 4, 10, 4)
         
         # User info
         user = config.get_user()
@@ -410,7 +410,7 @@ class DeckManagementDialog(QDialog):
             QPushButton {
                 border-radius: 6px;
                 font-weight: 600;
-                padding: 4px 16px;
+                padding: 2px 16px;
                 font-size: 13px;
             }
             
